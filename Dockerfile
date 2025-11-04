@@ -1,26 +1,36 @@
+# FROM python:3.12-slim
+# WORKDIR /app
+# COPY requirements.txt .
+# RUN pip install --no-cache-dir -r requirements.txt
+# RUN pip install -U google-generativeai langchain-google-genai langchain-core langchain langchain-community
+# COPY autoti/ /app/autoti
+# CMD ["python3", "-u", "autoti/analysis/langchain_agent.py"]
+
 # Use an official Python runtime as a parent image
 FROM python:3.12-slim
 
-# Set the working directory in the container
+# Set the working directory in the container to the root of your project
 WORKDIR /app
 
-# Copy the requirements file into the container at /app
+# 1. Copy setup and requirements files
+# Copy requirements.txt, setup.py, and app.py to the working directory /app
 COPY requirements.txt .
+COPY setup.py .
+COPY app.py .
 
-# Install any needed packages specified in requirements.txt
+# 2. Install dependencies, including the local 'autoti' package via '-e .'
+# NOTE: Removed the redundant RUN pip install -U ... line.
+# All needed packages (Gunicorn, Flask, LangChain, and autoti) must be in requirements.txt.
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -U google-generativeai langchain-google-genai langchain-core langchain langchain-community
+RUN pip install --no-cache-dir gunicorn
 
-# Copy the rest of the application's code into the container at /app
-COPY autoti/ /app/autoti
+# 3. Copy the custom package code
+COPY autoti /app/autoti
 
-# API keys should be passed in at runtime as environment variables.
-# Example:
-# docker run --rm \
-#   -e OTX_API_KEY="your_alienvault_otx_api_key" \
-#   -e GOOGLE_API_KEY="your_google_api_key" \
-#   autoti-app
+# 4. Expose the port where the Flask application runs
+EXPOSE 5000
 
-# Run the langchain_agent.py script when the container launches
-# This will demonstrate the full pipeline: collect, normalize, and report.
-# For a real-world scenario, you might have separate services or a script that orchestrates these calls.
-CMD ["python3", "-u", "autoti/analysis/langchain_agent.py"]
+# 5. Command to run the Flask application using Gunicorn
+# This is NOT your current CMD, but one that causes this error:
+CMD ["gunicorn", "app:app", "--user", "app:app"]
