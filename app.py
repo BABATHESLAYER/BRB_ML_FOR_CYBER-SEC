@@ -9,14 +9,21 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # Import the pipeline function from your custom package structure
 # This assumes your main script is autoti/analysis/langchain_agent.py
+# Initialize a variable to hold import errors globally
+IMPORT_ERROR_MESSAGE = None
+
 try:
     from autoti.analysis.langchain_agent import run_pipeline
 except ImportError as e:
-    # Log error if the autoti package cannot be found
-    print(f"FATAL ERROR: Could not import run_pipeline from autoti.analysis.langchain_agent. Check project structure and __init__.py files. Error: {e}")
-    # Define a dummy function to prevent Flask startup crash
+    # Store the error message in the global variable
+    IMPORT_ERROR_MESSAGE = str(e)
+    
+    print(f"FATAL ERROR: Could not import run_pipeline. Error: {IMPORT_ERROR_MESSAGE}")
+    
+    # Define the dummy function using the stored variable
     def run_pipeline():
-        return f"Application initialization failed. Import error: {e}"
+        # Use the global variable here
+        return f"Application initialization failed. Import error: {IMPORT_ERROR_MESSAGE}"
 
 
 app = Flask(__name__)

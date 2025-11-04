@@ -160,14 +160,64 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "YOUR_API_KEY_HERE")
 # OTX_API_KEY is defined in otx_collector.py, but we ensure the value is available
 # for the get_latest_pulses function call below.
 
-# ... (rest of get_llm, generate_threat_report functions remain the same) ...
 def get_llm(api_key):
-    # ... (function body remains the same) ...
-    pass
+    """Initializes and returns the ChatGoogleGenerativeAI model."""
+    if api_key in ("YOUR_API_KEY_HERE", None):
+        print("ERROR: Google API Key is missing.")
+        return None
+
+    # Note: Use gemini-2.5-flash for fast summaries
+    return ChatGoogleGenerativeAI(
+        google_api_key=api_key,
+        model="gemini-2.5-flash",
+        temperature=0.2,
+        convert_system_message_to_human=True
+    )
 
 def generate_threat_report(normalized_data, llm):
-    # ... (function body remains the same) ...
-    pass
+    """Generates a threat intelligence report using LangChain."""
+    if llm is None:
+        return "Report generation failed due to missing LLM configuration."
+
+    # NOTE: Assuming normalized_data is a DataFrame here based on the top commented code block
+    if isinstance(normalized_data, list) and not normalized_data:
+        return "No threat data available to generate a report."
+    
+    # If it's a list (from normalization) convert to DataFrame for simple processing,
+    # or handle the type conversion in normalize_pulses if not already a DataFrame.
+    # Assuming normalize_pulses now returns a DataFrame as implied by the commented logic.
+    if isinstance(normalized_data, list):
+         normalized_data = pd.DataFrame(normalized_data)
+
+    if normalized_data.empty:
+        return "No threat data available to generate a report."
+
+    # Convert the DataFrame head to a string for the prompt
+    top_threats = normalized_data.head(5)
+    data_summary_str = top_threats.to_string(
+        columns=['threat_name', 'threat_description', 'ioc_count'],
+        index=False
+    )
+
+    # --- Prompt Engineering ---
+    prompt_template = """
+    You are a senior threat intelligence analyst. Your task is to generate a concise, one-page executive summary report
+    based on the threat intelligence data collected in the last 24 hours.
+    ... (rest of the prompt template) ...
+    """ # ... (omitting full prompt for brevity)
+
+    prompt = PromptTemplate(input_variables=["data_summary"], template=prompt_template)
+    
+    # NOTE: You are importing LLMChain from langchain_classic, ensure this package is installed
+    chain = LLMChain(llm=llm, prompt=prompt)
+
+    try:
+        report = chain.invoke({"data_summary": data_summary_str})
+        return report['text']
+    except Exception as e:
+        return f"Failed to generate report. Error: {e}"
+
+
 
 # The main function to run the pipeline
 def run_pipeline():
