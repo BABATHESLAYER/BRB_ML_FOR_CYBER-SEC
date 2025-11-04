@@ -1,9 +1,16 @@
 import os
+import sys
 import pandas as pd
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains import LLMChain
 from langchain_openai import ChatOpenAI
 
+# Add the project root to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+# Import the data collection and normalization functions
+from autoti.collection.otx_collector import get_latest_pulses, OTX_API_KEY
+from autoti.processing.data_normalizer import normalize_pulses
 
 # --- Configuration ---
 # Your OpenAI API Key.
@@ -87,25 +94,22 @@ def generate_threat_report(normalized_data, llm):
         return f"Failed to generate report. Error: {e}"
 
 if __name__ == "__main__":
-    # --- Sample Normalized Data (for testing) ---
-    # This simulates the input from data_normalizer.py
-    sample_normalized_data = pd.DataFrame({
-        'pulse_id': ['668ba07c0823521f753c8c87', '668ba07c0823521f753c8c88'],
-        'threat_name': ["Malicious IPs related to Phishing Campaign", "Fake Browser Update (SocGholish)"],
-        'threat_description': [
-            "A new set of IPs hosting phishing sites targeting financial institutions.",
-            "SocGholish malware being distributed via fake browser update prompts on compromised websites."
-        ],
-        'ioc_count': [2, 1]
-    })
+    print("--- Starting Automated Threat Intelligence Pipeline ---")
 
-    print("--- Initializing LLM and Generating Threat Report ---")
+    # 1. Collect Data
+    print("\nStep 1: Fetching latest threat intelligence data...")
+    raw_pulses = get_latest_pulses(OTX_API_KEY)
 
-    # Initialize the LLM
+    # 2. Process Data
+    print("\nStep 2: Normalizing raw data...")
+    normalized_data = normalize_pulses(raw_pulses)
+
+    # 3. Analyze and Generate Report
+    print("\nStep 3: Initializing LLM and generating report...")
     llm = get_llm(OPENAI_API_KEY)
+    final_report = generate_threat_report(normalized_data, llm)
 
-    # Generate the report
-    final_report = generate_threat_report(sample_normalized_data, llm)
-
-    print("\n--- Generated Report ---")
+    # 4. Display Report
+    print("\n--- Final Threat Intelligence Report ---")
     print(final_report)
+    print("\n--- Pipeline Finished ---")
