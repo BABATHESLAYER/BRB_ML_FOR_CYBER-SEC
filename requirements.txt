@@ -1,0 +1,7 @@
+requests
+pandas
+langchain
+openai
+langchain-community
+langchain-openai
+langchain-classic
