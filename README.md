@@ -6,7 +6,7 @@ This project is a proof-of-concept for an automated system that collects, proces
 
 *   **Data Collection:** Fetches the latest threat intelligence pulses from AlienVault OTX.
 *   **Data Processing:** Normalizes raw JSON data into a structured pandas DataFrame.
-*   **AI-Powered Analysis:** Uses a LangChain agent with an OpenAI model to generate a summary report of the latest threats.
+*   **AI-Powered Analysis:** Uses a LangChain agent with Google's Gemini model to generate a summary report of the latest threats.
 *   **Containerized:** Docker support for easy setup and deployment.
 
 ## Project Structure
@@ -41,15 +41,16 @@ This project is a proof-of-concept for an automated system that collects, proces
     pip install -r requirements.txt
     ```
 
-3.  **Set your API keys as environment variables:**
+3.  **Configure your API keys:**
+    Create a `.env` file by copying the example template:
     ```bash
-    export OTX_API_KEY="your_alienvault_otx_api_key"
-    export OPENAI_API_KEY="your_openai_api_key"
+    cp .env.example .env
     ```
+    Now, open the `.env` file and replace the placeholder values with your actual API keys.
 
-4.  **Run a component script:**
+4.  **Run the main pipeline:**
     ```bash
-    python3 autoti/collection/otx_collector.py
+    python3 autoti/analysis/langchain_agent.py
     ```
 
 ## Running with Docker
@@ -63,11 +64,11 @@ This application is containerized using Docker for consistent and easy deploymen
     ```
 
 2.  **Run the Docker container:**
-    You must provide your AlienVault OTX and OpenAI API keys as environment variables when running the container.
+    You must provide your AlienVault OTX and Google API keys as environment variables when running the container.
     ```bash
     docker run --rm \
       -e OTX_API_KEY="your_alienvault_otx_api_key" \
-      -e OPENAI_API_KEY="your_openai_api_key" \
+      -e GOOGLE_API_KEY="your_google_api_key" \
       autoti-app
     ```
     The container will start, and the `langchain_agent.py` script will execute, printing the generated threat report to the console.

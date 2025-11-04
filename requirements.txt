@@ -1,7 +1,7 @@
 requests
 pandas
 langchain
-openai
 langchain-community
-langchain-openai
 langchain-classic
+langchain-google-genai
+python-dotenv

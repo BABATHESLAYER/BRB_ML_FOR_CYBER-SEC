@@ -13,10 +13,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application's code into the container at /app
 COPY autoti/ /app/autoti
 
-# Set environment variables for API keys
-# These should be passed in at runtime
-ENV OTX_API_KEY="YOUR_API_KEY_HERE"
-ENV OPENAI_API_KEY="YOUR_API_KEY_HERE"
+# API keys should be passed in at runtime as environment variables.
+# Example:
+# docker run --rm \
+#   -e OTX_API_KEY="your_alienvault_otx_api_key" \
+#   -e GOOGLE_API_KEY="your_google_api_key" \
+#   autoti-app
 
 # Run the langchain_agent.py script when the container launches
 # This will demonstrate the full pipeline: collect, normalize, and report.
