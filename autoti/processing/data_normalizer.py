@@ -1,35 +1,46 @@
+# This script is responsible for cleaning and structuring the raw data collected from OTX.
+# Data normalization is a critical step to ensure the data is consistent and easy to work with
+# in the analysis phase. We use the pandas library for efficient data manipulation.
+
 import pandas as pd
-from datetime import datetime
 
 def normalize_pulses(raw_pulses):
     """
     Normalizes a list of raw threat intelligence pulses into a structured pandas DataFrame.
 
+    The process involves:
+    - Selecting relevant columns.
+    - Renaming columns for clarity.
+    - Handling missing data.
+    - Converting data types.
+    - Extracting and creating new, useful features (like IOC count).
+
     Args:
-        raw_pulses (list): A list of dictionaries, where each dictionary is a raw pulse from OTX.
+        raw_pulses (list): A list of dictionaries, where each is a raw pulse from OTX.
 
     Returns:
-        pandas.DataFrame: A DataFrame containing the normalized threat intelligence data.
-                          Returns an empty DataFrame if the input is empty.
+        pandas.DataFrame: A clean, structured DataFrame. Returns an empty DataFrame on failure.
     """
     if not raw_pulses:
         print("Input pulse list is empty. Returning an empty DataFrame.")
         return pd.DataFrame()
 
-    # Convert the list of dictionaries to a DataFrame
+    # Convert the list of dictionaries into a pandas DataFrame for easier processing.
     df = pd.DataFrame(raw_pulses)
 
     # --- Data Cleaning and Structuring ---
 
-    # 1. Select relevant columns. We can expand this list as needed.
-    # We are interested in the pulse's name, description, creation date, and associated indicators.
+    # 1. Select Relevant Columns
+    # We choose the columns that are most useful for our analysis.
     required_columns = ['id', 'name', 'description', 'created', 'indicators']
 
-    # Filter for columns that exist in the DataFrame to avoid errors
+    # We filter for columns that actually exist in the DataFrame to avoid errors
+    # if the API response changes.
     existing_columns = [col for col in required_columns if col in df.columns]
     df_normalized = df[existing_columns].copy()
 
-    # 2. Rename columns for clarity and consistency
+    # 2. Rename Columns
+    # We use more descriptive and consistent column names.
     rename_map = {
         'id': 'pulse_id',
         'name': 'threat_name',
@@ -38,27 +49,32 @@ def normalize_pulses(raw_pulses):
     }
     df_normalized.rename(columns=rename_map, inplace=True)
 
-    # 3. Handle missing or null values
+    # 3. Handle Missing Values
+    # We replace any empty 'description' fields with a standard placeholder.
     df_normalized['threat_description'].fillna('No description provided.', inplace=True)
 
-    # 4. Convert data types for consistency
-    # Convert 'creation_date' from string to datetime objects
+    # 4. Convert Data Types
+    # The 'created' field is a string, but it's more useful as a datetime object
+    # for any time-based analysis.
     df_normalized['creation_date'] = pd.to_datetime(df_normalized['creation_date'])
 
-    # 5. Extract and count IOCs (Indicators of Compromise)
-    # This creates a new column with the number of IOCs for each pulse
+    # 5. Feature Engineering: Extract and Count IOCs
+    # We create a new column, 'ioc_count', to store the number of Indicators of Compromise
+    # for each threat pulse. This is a useful metric for assessing the pulse's scope.
     if 'indicators' in df_normalized.columns:
-        df_normalized['ioc_count'] = df_normalized['indicators'].apply(lambda x: len(x) if isinstance(x, list) else 0)
+        df_normalized['ioc_count'] = df_normalized['indicators'].apply(lambda ioc_list: len(ioc_list) if isinstance(ioc_list, list) else 0)
     else:
         df_normalized['ioc_count'] = 0
-
 
     print("Data normalization complete.")
     return df_normalized
 
+# --- STANDALONE EXECUTION FOR TESTING ---
 if __name__ == "__main__":
-    # --- Sample Raw Data (for testing) ---
-    # This simulates the kind of data we would get from otx_collector.py
+    # This block allows the script to be run directly for testing.
+    # We use sample data that mimics the structure of the real API response.
+    print("--- Testing Data Normalizer with Sample Data ---")
+
     sample_raw_data = [
         {
             "id": "668ba07c0823521f753c8c87",
@@ -73,7 +89,7 @@ if __name__ == "__main__":
         {
             "id": "668ba07c0823521f753c8c88",
             "name": "Fake Browser Update (SocGholish)",
-            "description": "", # Simulating a missing description
+            "description": "", # Simulate a missing description.
             "created": "2025-11-03T11:30:00.000Z",
             "indicators": [
                 {"type": "URL", "indicator": "http://evil-site.com/update.js"}
@@ -81,11 +97,11 @@ if __name__ == "__main__":
         }
     ]
 
-    print("--- Running Data Normalizer with Sample Data ---")
     normalized_df = normalize_pulses(sample_raw_data)
 
-    # Print the resulting DataFrame to verify
+    # Print the resulting DataFrame to verify the normalization process.
     print("\n--- Normalized DataFrame ---")
     print(normalized_df.head())
     print("\n--- DataFrame Info ---")
+    # .info() gives a useful summary of the DataFrame's structure and data types.
     normalized_df.info()

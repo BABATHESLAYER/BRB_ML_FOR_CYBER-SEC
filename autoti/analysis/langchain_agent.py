@@ -120,53 +120,52 @@
 #     print("\n--- Pipeline Finished ---")
 
 
-# autoti/analysis/langchain_agent.py
+# This script is the core of the automated threat intelligence pipeline.
+# It uses the LangChain library to interact with a Large Language Model (LLM)
+# from Google (Gemini) to generate a human-readable threat report.
 
 import os
-import sys
 import pandas as pd
 from dotenv import load_dotenv
 from langchain_core.prompts import PromptTemplate
 from langchain_classic.chains import LLMChain
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-# Load environment variables from .env file
-# NOTE: load_dotenv() will look for .env in the current working directory, 
-# which will be /app (the project root) in the Docker container.
+# Load environment variables (like API keys) from a '.env' file.
+# This is a secure way to manage sensitive information.
 load_dotenv()
 
-# --- IMPORTANT ADJUSTMENT FOR CUSTOM PACKAGE IMPORTS ---
-# Since you have a custom package 'autoti', we must ensure its root is on the path
-# when a script (like app.py) tries to import from 'autoti.analysis'.
-# When running from the root, we ensure the root '.' is in sys.path.
-# We'll handle this in the app.py for simplicity.
-# You can often remove or comment out complex path manipulation inside the library file:
-# sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
-# Import the data collection and normalization functions using relative imports 
-# or the full package path, assuming the project root is in sys.path.
-
-# Option 1: Full package path (Recommended for clarity, assuming root is on path)
-from autoti.collection.otx_collector import get_latest_pulses, OTX_API_KEY
+# --- PACKAGE IMPORTS ---
+# Import the necessary functions from other parts of the 'autoti' package.
+# 'get_latest_pulses' is used for data collection.
+# 'normalize_pulses' is used for data processing.
+from autoti.collection.otx_collector import get_latest_pulses
 from autoti.processing.data_normalizer import normalize_pulses
 
-# Option 2: Relative imports (Works if lang_chain_agent is the main entry point, but less clean for external Flask app)
-# from ..collection.otx_collector import get_latest_pulses, OTX_API_KEY
-# from ..processing.data_normalizer import normalize_pulses 
 
-
-# --- Configuration ---
+# --- LLM AND API CONFIGURATION ---
+# Retrieve the Google API key from environment variables.
+# Using .get() provides a default value, which helps prevent errors if the key isn't set.
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "YOUR_API_KEY_HERE")
-# OTX_API_KEY is defined in otx_collector.py, but we ensure the value is available
-# for the get_latest_pulses function call below.
+
 
 def get_llm(api_key):
-    """Initializes and returns the ChatGoogleGenerativeAI model."""
+    """
+    Initializes and configures the Large Language Model (LLM).
+
+    Args:
+        api_key (str): The Google API key for authentication.
+
+    Returns:
+        ChatGoogleGenerativeAI: An instance of the LLM, ready to be used.
+                                Returns None if the API key is missing.
+    """
     if api_key in ("YOUR_API_KEY_HERE", None):
         print("ERROR: Google API Key is missing.")
         return None
 
-    # Note: Use gemini-2.5-flash for fast summaries
+    # We use Google's 'gemini-2.5-flash' model, which is fast and suitable for summaries.
+    # 'temperature=0.2' makes the output more deterministic and focused.
     return ChatGoogleGenerativeAI(
         google_api_key=api_key,
         model="gemini-2.5-flash",
@@ -175,63 +174,82 @@ def get_llm(api_key):
     )
 
 def generate_threat_report(normalized_data, llm):
-    """Generates a threat intelligence report using LangChain."""
+    """
+    Generates the threat intelligence report by sending data and a prompt to the LLM.
+
+    Args:
+        normalized_data (pd.DataFrame): A DataFrame of processed threat data.
+        llm (ChatGoogleGenerativeAI): The initialized LLM instance.
+
+    Returns:
+        str: The generated report text. Returns an error message on failure.
+    """
     if llm is None:
         return "Report generation failed due to missing LLM configuration."
 
-    # NOTE: Assuming normalized_data is a DataFrame here based on the top commented code block
-    if isinstance(normalized_data, list) and not normalized_data:
-        return "No threat data available to generate a report."
-    
-    # If it's a list (from normalization) convert to DataFrame for simple processing,
-    # or handle the type conversion in normalize_pulses if not already a DataFrame.
-    # Assuming normalize_pulses now returns a DataFrame as implied by the commented logic.
-    if isinstance(normalized_data, list):
-         normalized_data = pd.DataFrame(normalized_data)
-
-    if normalized_data.empty:
+    if not isinstance(normalized_data, pd.DataFrame) or normalized_data.empty:
         return "No threat data available to generate a report."
 
-    # Convert the DataFrame head to a string for the prompt
+    # --- DATA PREPARATION FOR LLM ---
+    # We select the top 5 threats to create a concise summary.
+    # The DataFrame is converted to a string, which is a format the LLM can easily understand.
     top_threats = normalized_data.head(5)
     data_summary_str = top_threats.to_string(
         columns=['threat_name', 'threat_description', 'ioc_count'],
         index=False
     )
 
-    # --- Prompt Engineering ---
+    # --- PROMPT ENGINEERING ---
+    # This is the instruction we give to the LLM. A well-crafted prompt is crucial
+    # for getting a high-quality response.
+    # We tell the LLM its role ('senior threat intelligence analyst'), the desired format,
+    # and provide it with the data summary.
     prompt_template = """
     You are a senior threat intelligence analyst. Your task is to generate a concise, one-page executive summary report
     based on the threat intelligence data collected in the last 24 hours.
-    ... (rest of the prompt template) ...
-    """ # ... (omitting full prompt for brevity)
 
+    The report must be structured as follows:
+    1.  **Key Findings**: A high-level summary of the most significant threats.
+    2.  **Top Threats Details**: A brief description of each of the top threats observed.
+    3.  **General Mitigation Recommendations**: Actionable advice for a general audience to protect against these threats.
+
+    Here is the summary of the threat data:
+    ---
+    {data_summary}
+    ---
+
+    Please generate the report now.
+    """
+
+    # We use LangChain's PromptTemplate to structure the prompt and define input variables.
     prompt = PromptTemplate(input_variables=["data_summary"], template=prompt_template)
     
-    # NOTE: You are importing LLMChain from langchain_classic, ensure this package is installed
+    # An LLMChain combines the prompt and the LLM, creating a runnable component.
     chain = LLMChain(llm=llm, prompt=prompt)
 
     try:
+        # We 'invoke' the chain, passing our data summary. This sends the request to the LLM.
         report = chain.invoke({"data_summary": data_summary_str})
+        # The actual text is in the 'text' key of the response.
         return report['text']
     except Exception as e:
+        # Handle potential errors during the API call.
         return f"Failed to generate report. Error: {e}"
 
 
-
-# The main function to run the pipeline
+# --- MAIN PIPELINE FUNCTION ---
 def run_pipeline():
-    """Encapsulates the full pipeline for easy calling."""
-    # Ensure OTX_API_KEY is retrieved here or check its definition in otx_collector.py
-    # For robust use, you might retrieve OTX_API_KEY here from os.environ
-    otx_key = os.environ.get("OTX_API_KEY") 
-    
+    """
+    Orchestrates the entire process: data collection, processing, and report generation.
+    This function is designed to be called by other parts of the application, like the Flask app.
+    """
     print("--- Starting Automated Threat Intelligence Pipeline ---")
     
+    # Retrieve the OTX API key from environment variables.
+    otx_key = os.environ.get("OTX_API_KEY")
+
     # 1. Collect Data
     print("\nStep 1: Fetching latest threat intelligence data...")
-    # Pass the key explicitly if otx_collector doesn't load it internally, 
-    # otherwise use the imported variable (assuming it's set).
     raw_pulses = get_latest_pulses(otx_key) 
 
     # 2. Process Data
