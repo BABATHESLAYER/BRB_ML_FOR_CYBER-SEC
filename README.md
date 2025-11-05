@@ -1,32 +1,50 @@
 # Automated Threat Intelligence System (AutoTI)
 
-This project is a proof-of-concept for an automated system that collects, processes, and analyzes threat intelligence data to generate concise reports.
+## Project Overview
+
+AutoTI is an automated system that collects, processes, and analyzes threat intelligence data to generate concise, human-readable reports. It leverages AlienVault OTX for data collection and a Large Language Model (LLM) through LangChain for analysis, providing a streamlined workflow for threat intelligence.
 
 ## Features
 
-*   **Data Collection:** Fetches the latest threat intelligence pulses from AlienVault OTX.
-*   **Data Processing:** Normalizes raw JSON data into a structured pandas DataFrame.
-*   **AI-Powered Analysis:** Uses a LangChain agent with Google's Gemini model to generate a summary report of the latest threats.
-*   **Containerized:** Docker support for easy setup and deployment.
+- **Automated Data Collection:** Fetches the latest threat intelligence "pulses" from AlienVault OTX.
+- **Structured Data Processing:** Normalizes raw JSON data into a clean, structured pandas DataFrame, making it suitable for analysis.
+- **AI-Powered Analysis:** Utilizes a LangChain agent with a Google Gemini LLM to generate executive summary reports of the latest threats.
+- **Web Interface:** Provides a simple Flask-based web interface to view the generated reports.
+- **Containerized Deployment:** Includes a Dockerfile for easy and consistent setup and deployment.
 
 ## Project Structure
 
 ```
 .
 ├── autoti/
-│   ├── collection/
-│   │   └── otx_collector.py
-│   ├── processing/
-│   │   └── data_normalizer.py
+│   ├── __init__.py
 │   ├── analysis/
-│   │   └── langchain_agent.py
-│   └── ...
-├── Dockerfile
-├── requirements.txt
-└── README.md
+│   │   ├── __init__.py
+│   │   └── langchain_agent.py  # Core logic for LLM interaction and report generation.
+│   ├── collection/
+│   │   ├── __init__.py
+│   │   └── otx_collector.py      # Fetches data from the AlienVault OTX API.
+│   └── processing/
+│       ├── __init__.py
+│       └── data_normalizer.py  # Cleans and structures the raw data.
+├── .dockerignore
+├── .env.example                # Example environment file.
+├── .gitignore
+├── Dockerfile                  # For building the Docker container.
+├── README.md                   # This file.
+├── app.py                      # The Flask web application.
+├── requirements.txt            # Python dependencies.
+└── setup.py                    # Setup script for the autoti package.
 ```
 
-## Setup and Installation (Local)
+## Setup and Installation
+
+### Prerequisites
+
+- Python 3.8+
+- Docker (optional, for containerized deployment)
+
+### Local Installation
 
 1.  **Clone the repository:**
     ```bash
@@ -36,39 +54,47 @@ This project is a proof-of-concept for an automated system that collects, proces
 
 2.  **Create a virtual environment and install dependencies:**
     ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate
+    python3 -m venv venv
+    source venv/bin/activate
     pip install -r requirements.txt
     ```
 
-3.  **Configure your API keys:**
-    Create a `.env` file by copying the example template:
+3.  **Configure API Keys:**
+    Create a `.env` file by copying the example:
     ```bash
     cp .env.example .env
     ```
-    Now, open the `.env` file and replace the placeholder values with your actual API keys.
+    Open the `.env` file and add your actual API keys for AlienVault OTX and Google.
 
-4.  **Run the main pipeline:**
+### Running the Application
+
+There are two ways to run the application:
+
+1.  **As a Command-Line Tool:**
+    To run the entire pipeline and print the report to the console:
     ```bash
-    python3 autoti/analysis/langchain_agent.py
+    python autoti/analysis/langchain_agent.py
     ```
+
+2.  **As a Web Application:**
+    To start the Flask web server and view the report in your browser:
+    ```bash
+    flask run
+    ```
+    The application will be available at `http://localhost:5000`.
 
 ## Running with Docker
 
-This application is containerized using Docker for consistent and easy deployment.
+The application is containerized for easy deployment.
 
 1.  **Build the Docker image:**
-    From the root of the project directory, run the following command:
     ```bash
     docker build -t autoti-app .
     ```
 
 2.  **Run the Docker container:**
-    You must provide your AlienVault OTX and Google API keys as environment variables when running the container.
+    You must provide your API keys as environment variables.
     ```bash
-    docker run --rm \
-      -e OTX_API_KEY="your_alienvault_otx_api_key" \
-      -e GOOGLE_API_KEY="your_google_api_key" \
-      autoti-app
+    docker run -p 5000:5000 --env-file .env autoti-app
     ```
-    The container will start, and the `langchain_agent.py` script will execute, printing the generated threat report to the console.
+    The web application will be accessible at `http://localhost:5000`.
